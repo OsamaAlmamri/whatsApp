@@ -22,7 +22,7 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
         $this->button_bulk_action = true;
         $this->button_action_style = "button_icon";
         $this->button_add = true;
-        $this->button_edit = false;
+        $this->button_edit = true;
         $this->button_delete = true;
         $this->button_detail = true;
         $this->button_show = true;
@@ -34,6 +34,7 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
 
         # START COLUMNS DO NOT REMOVE THIS LINE
         $this->col = [];
+        $this->col[] = ["label" => "Group", "name" => "group_id", "join" => "groups,name"];
         $this->col[] = ["label" => "Number", "name" => "number"];
         $this->col[] = ["label" => "Text", "name" => "text"];
         $this->col[] = ["label" => "Device", "name" => "id_device", "join" => "device,name"];
@@ -46,10 +47,26 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
         # START FORM DO NOT REMOVE THIS LINE
         $this->form = [];
 //        $this->form[] = ['label' => 'Number', 'name' => 'number', 'type' => 'text', 'validation' => 'required|numeric|min:1', 'width' => 'col-sm-10', 'help' => 'The receiver phone number in format: [Country Code Without + Sign][Phone Number]. Example: 628231xxxxxx.'];
-        $this->form[] = ['label' => 'Number', 'name' => 'number', 'type' => 'text', 'validation' => 'required', 'width' => 'col-sm-10', 'help' => 'The receiver phone number in format: [Country Code Without + Sign][Phone Number]. Example: 628231xxxxxx.'];
+
+
+        $this->form[] = ['label' => 'المحموعة', 'name' => 'group_id', 'type' => 'select2',
+            'validation' => 'nullable', 'width' => 'col-sm-10',
+            'datatable' => 'groups,name', 'help' => 'if you went send to group ',
+            'datatable_where' => 'user_id=' . CRUDBooster::myId()];
+
+        $this->form[] = ['label' => 'Numbers', 'name' => 'number', 'type' => 'text', 'validation' =>
+            'nullable',
+            'width' => 'col-sm-10',
+            'help' => 'The receivers phone number in format: [Country Code Without + Sign][Phone Number]. Example: 628231xxxxxx,96777xxxxxx'];
         $this->form[] = ['label' => 'Text', 'name' => 'text', 'type' => 'textarea', 'validation' => 'required|string|min:5|max:5000', 'width' => 'col-sm-10'];
-        $this->form[] = ['label' => 'Device', 'name' => 'id_device', 'type' => 'select2', 'validation' => 'required', 'width' => 'col-sm-10', 'datatable' => 'device,name', 'help' => 'Will show conneted device', 'datatable_where' => 'status="connected"'];
-        $this->form[] = ['label' => 'Message Type', 'name' => 'type', 'type' => 'select', 'validation' => 'required', 'width' => 'col-sm-10', 'dataenum' => 'Text;Image;Video;PDF', 'default' => 'Text'];
+        $this->form[] = ['label' => 'Device', 'name' => 'id_device', 'type' => 'select2',
+            'validation' => 'required', 'width' => 'col-sm-10',
+            'datatable' => 'device,name', 'help' => 'Will show conneted device',
+            'datatable_where' => 'status="connected"'];
+        $this->form[] = ['label' => 'Message Type', 'name' => 'type',
+            'type' => 'select', 'validation' => 'required', 'width' => 'col-sm-10',
+            'value' => "Text",
+            'dataenum' => 'Text;Image;Video;PDF', 'default' => 'Text'];
         $this->form[] = ['label' => 'File', 'name' => 'url_file', 'type' => 'upload', 'width' => 'col-sm-10'];
         # END FORM DO NOT REMOVE THIS LINE
 
@@ -95,6 +112,7 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
     public function hook_before_add(&$postdata)
     {
 
+
         $getnumber = substr($postdata['number'], 1);
         $regional = 62;
         if ($getnumber == 0 || $getnumber == 8) {
@@ -137,12 +155,18 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
 
 
         $mes = [];
+        $groupNumbers = DB::table('phones')
+            ->groupBy('number')
+            ->get('number')
+            ->pluck('number')->toArray();
+        $numbers=array_unique(array_merge($groupNumbers,$numbers));
         foreach ($numbers as $number)
             $mes[] = [
                 'receiver' => $number,
                 'message' => $body
             ];
         //send api
+        if (count($mes)>0)
         $response = Http::post(env('URL_WA_SERVER') . '/chats/send-bulk?id=' . $device->name, $mes);
         // dd($response);
         $res = json_decode($response->getBody());
@@ -156,6 +180,8 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
 
     public function hook_before_edit(&$postdata, $id)
     {
+
+        $this->hook_before_add($postdata);
 
     }
 
