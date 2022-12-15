@@ -109,9 +109,18 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
     {
     }
 
+    public function sendMessage(Request $request)
+
+    {
+        $requestData=request()->all();
+        $d=$this->hook_before_add($requestData);
+        return dd($d);
+    }
+
     public function hook_before_add(&$postdata)
     {
 
+//        return dd($postdata);
 
         $getnumber = substr($postdata['number'], 1);
         $regional = 62;
@@ -119,14 +128,24 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
             $format_number = $regional . substr($postdata['number'], 1);
         } else {
             $format_number = $postdata['number'];
+
         }
 
         $numbers = explode(',', $postdata['number']);
 
-        $device = DB::table('device')->select('name')->where('id', $postdata['id_device'])->first();
+        if(isset($postdata['device_phone'])  and $postdata['device_phone']!=null)
+        $device = DB::table('device')->select('name')
+            ->where('status','connected')
+            ->where('number', $postdata['device_phone'])->first();
+        else
+        $device = DB::table('device')->select('name')->where('status','connected')->where('id', $postdata['id_device'])->first();
         // echo "tipe pesan ".$postdata['type'];
         // Text;Image;Video;PDF
         // send text
+        if (!$device)
+        {
+            return (['status'=>false,'message'=>'decice not connect']);
+        }
         if ($postdata['type'] == "Text") {
             $body = ['text' => $postdata['text']];
         } else if ($postdata['type'] == "Image") {
@@ -143,7 +162,7 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
             $body = [
                 'document' => ['url' => url($postdata['url_file'])],
                 'mimetype' => 'application/pdf',
-                'fileName' => 'document.pdf'
+                'fileName' => $postdata['fileName']??'document.pdf'
             ];
         }
 
@@ -156,21 +175,65 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
 
         $mes = [];
         $groupNumbers = DB::table('phones')
+            ->where('group_id',$postdata['group_id'])
             ->groupBy('number')
             ->get('number')
             ->pluck('number')->toArray();
-        $numbers=array_unique(array_merge($groupNumbers,$numbers));
+
+        if (!$groupNumbers) ;
+        $groupNumbers = [];
+
+//        const templateButtons = [
+//  {index: 1, urlButton: {displayText: '⭐ Star Baileys on GitHub!', url: 'https://github.com/adiwajshing/Baileys'}},
+//  {index: 2, callButton: {displayText: 'Call me!', phoneNumber: '+1 (234) 5678-901'}},
+//  {index: 3, quickReplyButton: {displayText: 'This is a reply, just like normal buttons!', id: 'id-like-buttons-message'}},
+//]
+//
+//const buttonMessage = {
+//        text: "Hi it's a template message",
+//    footer: 'Hello World',
+//    templateButtons: templateButtons,
+//    image: {url: 'https://example.com/image.jpeg'}
+//}
+
+        $templateButtons = [
+            ["index" => 1, "urlButton" => ["displayText" => '⭐ Star Baileys on GitHub!', "url" => 'https://github.com/adiwajshing/Baileys']],
+            ["index" => 2, "callButton" => ["displayText" => 'Call me!', "phoneNumber" => '+1 (234) 5678-901']],
+            ["index" => 3, "quickReplyButton" => ["displayText" => 'This is a reply, just like normal buttons!', "id" => 'id-like-buttons-message']],
+        ];
+
+        $buttonMessage = [
+            "text" => "Hi it's a template message",
+            "footer" => 'Hello World',
+            "templateButtons" => $templateButtons,
+            "image" => ["url" => 'https://images.pexels.com/photos/301599/pexels-photo-301599.jpeg']
+        ];
+
+//
+//        $body = [
+////            'text' => $postdata['text'],
+//            'image' => ['url' =>"https://purepng.com/public/uploads/large/purepng.com-mariomariofictional-charactervideo-gamefranchisenintendodesigner-1701528634653vywuz.png"],
+//            'caption' => $postdata['text']
+//        ];
+
+        $numbers = array_unique(array_merge($groupNumbers, $numbers));
         foreach ($numbers as $number)
             $mes[] = [
                 'receiver' => $number,
                 'message' => $body
             ];
         //send api
-        if (count($mes)>0)
-        $response = Http::post(env('URL_WA_SERVER') . '/chats/send-bulk?id=' . $device->name, $mes);
-        // dd($response);
+//        return dd($device);
+        if (count($mes) > 0)
+            $response = Http::post(env('URL_WA_SERVER') . '/chats/send-bulk?id=' . $device->name, $mes);
         $res = json_decode($response->getBody());
+//        dd($res);
+
+//        return dd($res);
         $postdata['status'] = $res->success;
+
+        return  $res;
+
     }
 
     public function hook_after_add($id)
