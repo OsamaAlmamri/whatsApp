@@ -114,7 +114,7 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
     {
         $requestData=request()->all();
         $d=$this->hook_before_add($requestData);
-        return dd($d);
+        return ($d);
     }
 
     public function hook_before_add(&$postdata)
@@ -144,7 +144,7 @@ class AdminOutboxController extends \crocodicstudio\crudbooster\controllers\CBCo
         // send text
         if (!$device)
         {
-            return (['status'=>false,'message'=>'decice not connect']);
+            return response()->json(['success'=>false,'message'=>'decice not connect'], 200, [], JSON_UNESCAPED_UNICODE);
         }
         if ($postdata['type'] == "Text") {
             $body = ['text' => $postdata['text']];
